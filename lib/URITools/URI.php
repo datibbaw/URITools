@@ -2,211 +2,118 @@
 
 namespace URITools;
 
-class URI implements \ArrayAccess, \Iterator, \Countable, \JsonSerializable
-{
-    const SCHEME   = 0x01;
-    const USER     = 0x02;
-    const PASS     = 0x04;
-    const HOST     = 0x08;
-    const PORT     = 0x10;
-    const PATH     = 0x20;
-    const QUERY    = 0x40;
-    const FRAGMENT = 0x80;
+use InvalidArgumentException;
+use JsonSerializable;
 
-    // The private props and magic methods are only implemented like this to give type validation,
-    // these are effectively public properties
-    private $scheme;
-    private $user;
-    private $pass;
-    private $host;
-    private $port;
-    private $path;
-    private $query;
-    private $fragment;
+/**
+ * @property $scheme string
+ * @property $user string
+ * @property $pass string
+ * @property $host string
+ * @property $port string
+ * @property $path string
+ * @property $query QueryLevel
+ * @property $fragment string
+ */
+class URI implements JsonSerializable
+{
+    const SCHEME   = 'scheme';
+    const USER     = 'user';
+    const PASS     = 'pass';
+    const HOST     = 'host';
+    const PORT     = 'port';
+    const PATH     = 'path';
+    const QUERY    = 'query';
+    const FRAGMENT = 'fragment';
+
+    // We expose our private parts via ArrayAccess ;-)
+    /**
+     * @var array
+     */
+    protected $parts = array();
 
     // obviously these two properties would be handled internally in a native impl
-    private static $constPropMap = [
-        self::SCHEME   => 'scheme',
-        self::USER     => 'user',
-        self::PASS     => 'pass',
-        self::HOST     => 'host',
-        self::PORT     => 'port',
-        self::PATH     => 'path',
-        self::QUERY    => 'query',
-        self::FRAGMENT => 'fragment',
+    protected static $constPropMap = [
+        self::SCHEME,
+        self::USER,
+        self::PASS,
+        self::HOST,
+        self::PORT,
+        self::PATH,
+        self::QUERY,
+        self::FRAGMENT,
     ];
-    private $iterationPointer = self::SCHEME;
 
     private function validateScheme($value)
     {
-        // in the generic URI syntax, only the format of the scheme is rigid
-        return (bool) preg_match('/^[a-z][a-z0-9+.\-]*$/i', $value);
+        if (!preg_match('/^[a-z][a-z0-9+.\-]*$/i', $value)) {
+            throw new InvalidArgumentException(sprintf("'%s': Invalid URI Scheme", $value));
+        }
+        return $value;
     }
 
     public function __construct($uri)
     {
-        $parts = [];
-        $this->query = new QueryLevel;
-
-        if (((string) $uri) !== '' && false === $parts = parse_url($uri)) {
-            throw new \InvalidArgumentException('Invalid URI');
+        if (($this->parts = parse_url($uri)) === false) {
+            throw new InvalidArgumentException('Invalid URI');
         }
 
-        foreach ($parts as $name => $value) {
-            $this->__set($name, urldecode($value));
-        }
+        $this->setQuery($this->get(self::QUERY));
     }
+
+    protected function setQuery($value)
+    {
+        if ($value !== null) {
+            parse_str($value, $query);
+        } else {
+            $query = [];
+        }
+        $this->parts[self::QUERY] = new QueryLevel($query);
+    }
+
+    protected function get($name)
+    {
+        return isset($this->parts[$name]) ? $this->parts[$name] : null;
+    }
+
+    /* Magic methods */
 
     public function __get($name)
     {
         if (!in_array($name, self::$constPropMap)) {
-            trigger_error('Undefined property: ' . __CLASS__ . '::$' . $name, E_USER_NOTICE);
-            return null;
+            throw new InvalidArgumentException(sprintf("'%s': Invalid URI Part", $name));
         }
 
-        return $this->$name;
+        return $this->get($name);
     }
 
     public function __set($name, $value)
     {
-        if ($value === null) {
-            $this->$name = null;
-        } else if ($name === 'port') {
-            $this->port = (int) $value;
-        } else if ($name === 'query') {
-            parse_str($value, $query);
-            $this->query = new QueryLevel($query);
-        } else if (in_array($name, self::$constPropMap)) {
-            if ($name === 'scheme' && !$this->validateScheme($value)) {
-                throw new \InvalidArgumentException('Invalid URI scheme');
-            }
+        switch ($name) {
+            case self::QUERY:
+                $this->setQuery($value);
+                return;
 
-            $this->$name = (string) $value;
-        } else {
-            // because PHP allows expando properties on anything afaik :-(
-            $this->$name = $value;
+            case self::PORT:
+                $value = (int)$value;
+                break;
+
+            case self::SCHEME:
+                $value = $this->validateScheme($value);
+                break;
+
+            default:
+                if (!in_array($name, self::$constPropMap)) {
+                    throw new InvalidArgumentException(sprintf("'%s': Invalid URI Part", $name));
+                }
         }
+
+        $this->parts[$name] = $value;
     }
 
     public function __toString()
     {
-        $result = '';
-
-        if (isset($this->scheme)) {
-            $result = $this->scheme . ':';
-        }
-
-        if (isset($this->host)) {
-            $result .= '//';
-
-            if (isset($this->user)) {
-                $result .= urlencode($this->user);
-
-                if (isset($this->pass)) {
-                    $result .= ':' . urlencode($this->pass);
-                }
-
-                $result .= '@';
-            }
-
-            $result .= urlencode($this->host);
-
-            if (isset($this->port)) {
-                $result .= ':' . $this->port;
-            }
-        }
-
-        if (isset($this->path)) {
-            $result .= implode('/', array_map('urlencode', preg_split('~/+~', $this->path)));
-        }
-
-        if (count($this->query)) {
-            $result .= '?' . $this->query;
-        }
-
-        if (isset($this->fragment)) {
-            $result .= '#' . urlencode($this->fragment);
-        }
-
-        return $result;
-    }
-
-    /* ArrayAccess */
-
-    public function offsetExists($name)
-    {
-        return isset($this->$name) || isset(self::$constPropMap[$name]);
-    }
-
-    public function offsetGet($name)
-    {
-        if (isset(self::$constPropMap[$name])) {
-            return $this->__get(self::$constPropMap[$name]);
-        } else {
-            return $this->__get($name);
-        }
-    }
-
-    public function offsetSet($name, $value)
-    {
-        if (isset(self::$constPropMap[$name])) {
-            $this->__set(self::$constPropMap[$name], $value);
-        } else {
-            $this->__set($name, $value);
-        }
-    }
-
-    public function offsetUnset($name)
-    {
-        if (isset(self::$constPropMap[$name])) {
-            $this->__set(self::$constPropMap[$name], null);
-        } else if (in_array($name, self::$constPropMap)) {
-            $this->__set($name, null);
-        } else {
-            unset($this->$name);
-        }
-    }
-
-    /* Iterator */
-
-    public function current()
-    {
-        return $this->{self::$constPropMap[$this->iterationPointer]};
-    }
-
-    public function key()
-    {
-        return self::$constPropMap[$this->iterationPointer];
-    }
-
-    public function next()
-    {
-        $this->iterationPointer *= 2;
-    }
-
-    public function rewind()
-    {
-        $this->iterationPointer = self::SCHEME;
-    }
-
-    public function valid()
-    {
-        return $this->iterationPointer <= self::FRAGMENT;
-    }
-
-    /* Countable */
-
-    public function count()
-    {
-        $result = 0;
-
-        foreach (self::$constPropMap as $const => $name) {
-            if ($this->$name !== null) {
-                $result++;
-            }
-        }
-
-        return $result;
+        return self::asString($this->parts);
     }
 
     /* JsonSerializable */
@@ -214,5 +121,49 @@ class URI implements \ArrayAccess, \Iterator, \Countable, \JsonSerializable
     public function jsonSerialize()
     {
         return $this->__toString();
+    }
+
+    /* Static methods */
+    public static function asString(array $parts)
+    {
+        $result = '';
+
+        if (isset($parts[self::SCHEME])) {
+            $result = $parts[self::SCHEME] . ':';
+        }
+
+        if (isset($parts[self::HOST])) {
+            $result .= '//';
+
+            if (isset($parts[self::USER])) {
+                $result .= urlencode($parts[self::USER]);
+
+                if (isset($parts[self::PASS])) {
+                    $result .= ':' . urlencode($parts[self::PASS]);
+                }
+
+                $result .= '@';
+            }
+
+            $result .= urlencode($parts[self::HOST]);
+
+            if (isset($parts[self::PORT])) {
+                $result .= ':' . $parts[self::PORT];
+            }
+        }
+
+        if (isset($parts[self::PATH])) {
+            $result .= implode('/', array_map('urlencode', preg_split('~/+~', $parts[self::PATH])));
+        }
+
+        if (isset($parts[self::QUERY]) && count($parts[self::QUERY])) {
+            $result .= '?' . $parts[self::QUERY];
+        }
+
+        if (isset($parts[self::FRAGMENT])) {
+            $result .= '#' . urlencode($parts[self::FRAGMENT]);
+        }
+
+        return $result;
     }
 }

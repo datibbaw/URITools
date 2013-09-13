@@ -2,11 +2,11 @@
 
 namespace URITools;
 
-class QueryLevel implements \ArrayAccess, \Iterator, \Countable
+use ArrayIterator;
+
+class QueryLevel implements \ArrayAccess, \Countable, \IteratorAggregate
 {
     private $elements = [];
-
-    private $iterationValid;
 
     private function encodeElement($name, $value, $nameFormat = '%s')
     {
@@ -82,6 +82,13 @@ class QueryLevel implements \ArrayAccess, \Iterator, \Countable
         return implode('&', $result);
     }
 
+    /* Iterator */
+
+    public function getIterator()
+    {
+        return new ArrayIterator($this->elements);
+    }
+
     /* ArrayAccess */
 
     public function offsetExists($name)
@@ -102,33 +109,6 @@ class QueryLevel implements \ArrayAccess, \Iterator, \Countable
     public function offsetUnset($name)
     {
         unset($this->elements[$name]);
-    }
-
-    /* Iterator */
-
-    public function current()
-    {
-        return current($this->elements);
-    }
-
-    public function key()
-    {
-        return key($this->elements);
-    }
-
-    public function next()
-    {
-        next($this->elements);
-    }
-
-    public function rewind()
-    {
-        reset($this->elements);
-    }
-
-    public function valid()
-    {
-        return key($this->elements) !== null;
     }
 
     /* Countable */
