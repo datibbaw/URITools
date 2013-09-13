@@ -1,10 +1,4 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: tjerk
- * Date: 13/9/13
- * Time: 11:01 PM
- */
 
 namespace URITools;
 

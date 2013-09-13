@@ -4,8 +4,10 @@
     "minimum-stability": "dev",
     "authors": [
         {
-            "name": "Jack",
+            "name": "Tjerk Meesters",
             "email": "datibbaw@php.net"
+        }, {
+            "name": "Chris Wright"
         }
     ],
     "require-dev": {

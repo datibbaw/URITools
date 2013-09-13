@@ -2,16 +2,8 @@
 use URITools\ArrayAccessURI;
 use URITools\URI;
 
-/**
- * Created by PhpStorm.
- * User: tjerk
- * Date: 13/9/13
- * Time: 9:51 PM
- */
-
 class URITest extends PHPUnit_Framework_TestCase
 {
-
     public function testBasic()
     {
         $uri = new URI('http://www.example.org');
@@ -22,6 +14,12 @@ class URITest extends PHPUnit_Framework_TestCase
             $uri
         );
 
+
+        $uri->path = '/';
+        $this->assertEquals(
+            'https://www.example.org/',
+            $uri
+        );
     }
 
     public function testQuery()
