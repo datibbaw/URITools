@@ -17,103 +17,135 @@ use JsonSerializable;
  */
 class URI implements JsonSerializable
 {
-    const SCHEME   = 'scheme';
-    const USER     = 'user';
-    const PASS     = 'pass';
-    const HOST     = 'host';
-    const PORT     = 'port';
-    const PATH     = 'path';
-    const QUERY    = 'query';
-    const FRAGMENT = 'fragment';
-
-    // We expose our private parts via ArrayAccess ;-)
-    /**
-     * @var array
-     */
-    protected $parts = array();
-
-    // obviously these two properties would be handled internally in a native impl
-    protected static $constPropMap = [
-        self::SCHEME,
-        self::USER,
-        self::PASS,
-        self::HOST,
-        self::PORT,
-        self::PATH,
-        self::QUERY,
-        self::FRAGMENT,
-    ];
-
-    private function validateScheme($value)
-    {
-        if (!preg_match('/^[a-z][a-z0-9+.\-]*$/i', $value)) {
-            throw new InvalidArgumentException(sprintf("'%s': Invalid URI Scheme", $value));
-        }
-        return $value;
-    }
+    protected $scheme;
+    protected $user;
+    protected $pass;
+    protected $host;
+    protected $port;
+    protected $path;
+    protected $query;
+    protected $fragment;
 
     public function __construct($uri)
     {
-        if (($this->parts = parse_url($uri)) === false) {
+        if (($parts = parse_url($uri)) === false) {
             throw new InvalidArgumentException('Invalid URI');
         }
 
-        $this->setQuery($this->get(self::QUERY));
+        foreach ($parts as $name => $value) {
+            $this->$name = $value;
+        }
+
+        $this->setQuery($this->query);
     }
 
-    protected function setQuery($value)
+    public function setScheme($value)
+    {
+        if ($value !== null && !preg_match('/^[a-z][a-z0-9+.\-]*$/i', $value)) {
+            throw new InvalidArgumentException(sprintf("'%s': Invalid URI Scheme", $value));
+        }
+        $this->scheme = $value;
+    }
+
+    public function setPort($value)
+    {
+        if ($value !== null) {
+            $value = (int)$value;
+        }
+        $this->port = $value;
+    }
+
+    public function setQuery($value)
     {
         if ($value !== null) {
             parse_str($value, $query);
         } else {
             $query = [];
         }
-        $this->parts[self::QUERY] = new QueryLevel($query);
+        $this->query = new QueryString($query);
     }
 
-    protected function get($name)
+    public function asString()
     {
-        return isset($this->parts[$name]) ? $this->parts[$name] : null;
+        $result = '';
+
+        if ($this->scheme !== null) {
+            $result = $this->scheme . ':';
+        }
+
+        if ($this->host !== null) {
+            $result .= '//';
+
+            if ($this->user !== null) {
+                $result .= urlencode($this->user);
+
+                if ($this->pass !== null) {
+                    $result .= ':' . urlencode($this->pass);
+                }
+
+                $result .= '@';
+            }
+
+            $result .= urlencode($this->host);
+
+            if ($this->port) {
+                $result .= ':' . $this->port;
+            }
+        }
+
+        if ($this->path) {
+            $result .= implode('/', array_map('urlencode', preg_split('~/+~', $this->path)));
+        }
+
+        if (count($this->query)) {
+            $result .= '?' . $this->query;
+        }
+
+        if ($this->fragment !== null) {
+            $result .= '#' . urlencode($this->fragment);
+        }
+
+        return $result;
     }
 
     /* Magic methods */
 
     public function __get($name)
     {
-        if (!in_array($name, self::$constPropMap)) {
+        if (!property_exists($this, $name)) {
             throw new InvalidArgumentException(sprintf("'%s': Invalid URI Part", $name));
         }
 
-        return $this->get($name);
+        return $this->$name;
     }
 
     public function __set($name, $value)
     {
         switch ($name) {
-            case self::QUERY:
+            case 'query':
                 $this->setQuery($value);
                 return;
 
-            case self::PORT:
-                $value = (int)$value;
-                break;
+            case 'port':
+                $this->setPort($value);
+                return;
 
-            case self::SCHEME:
-                $value = $this->validateScheme($value);
-                break;
+            case 'scheme':
+                $this->setScheme($value);
+                return;
 
             default:
-                if (!in_array($name, self::$constPropMap)) {
+                if (!property_exists($this, $name)) {
                     throw new InvalidArgumentException(sprintf("'%s': Invalid URI Part", $name));
                 }
         }
 
-        $this->parts[$name] = $value;
+        $this->$name = $value;
     }
 
     public function __toString()
     {
-        return self::asString($this->parts);
+        return $this->asString();
     }
 
     /* JsonSerializable */
@@ -121,49 +153,5 @@ class URI implements JsonSerializable
     public function jsonSerialize()
     {
         return $this->__toString();
-    }
-
-    /* Static methods */
-    public static function asString(array $parts)
-    {
-        $result = '';
-
-        if (isset($parts[self::SCHEME])) {
-            $result = $parts[self::SCHEME] . ':';
-        }
-
-        if (isset($parts[self::HOST])) {
-            $result .= '//';
-
-            if (isset($parts[self::USER])) {
-                $result .= urlencode($parts[self::USER]);
-
-                if (isset($parts[self::PASS])) {
-                    $result .= ':' . urlencode($parts[self::PASS]);
-                }
-
-                $result .= '@';
-            }
-
-            $result .= urlencode($parts[self::HOST]);
-
-            if (isset($parts[self::PORT])) {
-                $result .= ':' . $parts[self::PORT];
-            }
-        }
-
-        if (isset($parts[self::PATH])) {
-            $result .= implode('/', array_map('urlencode', preg_split('~/+~', $parts[self::PATH])));
-        }
-
-        if (isset($parts[self::QUERY]) && count($parts[self::QUERY])) {
-            $result .= '?' . $parts[self::QUERY];
-        }
-
-        if (isset($parts[self::FRAGMENT])) {
-            $result .= '#' . urlencode($parts[self::FRAGMENT]);
-        }
-
-        return $result;
     }
 }

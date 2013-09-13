@@ -7,13 +7,13 @@ class URITest extends PHPUnit_Framework_TestCase
     public function testBasic()
     {
         $uri = new URI('http://www.example.org');
-        $uri->scheme = 'https';
+        $this->assertEquals($uri, $uri->asString());
 
+        $uri->scheme = 'https';
         $this->assertEquals(
             'https://www.example.org',
             $uri
         );
-
 
         $uri->path = '/';
         $this->assertEquals(
