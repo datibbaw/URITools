@@ -26,17 +26,59 @@ class URI implements JsonSerializable
     protected $query;
     protected $fragment;
 
-    public function __construct($uri)
+    public function __construct($uri = null)
     {
-        if (($parts = parse_url($uri)) === false) {
-            throw new InvalidArgumentException('Invalid URI');
-        }
+        if ($uri !== null) {
+            if (($parts = parse_url($uri)) === false) {
+                throw new InvalidArgumentException('Invalid URI');
+            }
 
-        foreach ($parts as $name => $value) {
-            $this->$name = $value;
-        }
+            foreach ($parts as $name => $value) {
+                $this->$name = $value;
+            }
 
-        $this->setQuery($this->query);
+            $this->setQuery($this->query);
+        }
+    }
+
+    public function getScheme()
+    {
+        return $this->scheme;
+    }
+
+    public function getUser()
+    {
+        return $this->user;
+    }
+
+    public function getPass()
+    {
+        return $this->pass;
+    }
+
+    public function getHost()
+    {
+        return $this->host;
+    }
+
+    public function getPort()
+    {
+        return $this->port;
+    }
+
+    public function getPath()
+    {
+        return $this->path;
+    }
+
+    public function getQuery()
+    {
+        return $this->query;
+    }
+
+    public function getFragment()
+    {
+        return $this->fragment;
     }
 
     public function setScheme($value)
@@ -47,12 +89,32 @@ class URI implements JsonSerializable
         $this->scheme = $value;
     }
 
+    public function setUser($user)
+    {
+        $this->user = $user;
+    }
+
+    public function setPass($pass)
+    {
+        $this->pass = $pass;
+    }
+
+    public function setHost($host)
+    {
+        $this->host = $host;
+    }
+
     public function setPort($value)
     {
         if ($value !== null) {
             $value = (int)$value;
         }
         $this->port = $value;
+    }
+
+    public function setPath($path)
+    {
+        $this->path = $path;
     }
 
     public function setQuery($value)
@@ -63,6 +125,11 @@ class URI implements JsonSerializable
             $query = [];
         }
         $this->query = new QueryString($query);
+    }
+
+    public function setFragment($fragment)
+    {
+        $this->fragment = $fragment;
     }
 
     public function asString()
@@ -121,23 +188,14 @@ class URI implements JsonSerializable
 
     public function __set($name, $value)
     {
-        switch ($name) {
-            case 'query':
-                $this->setQuery($value);
-                return;
-
-            case 'port':
-                $this->setPort($value);
-                return;
-
-            case 'scheme':
-                $this->setScheme($value);
-                return;
-
-            default:
-                if (!property_exists($this, $name)) {
-                    throw new InvalidArgumentException(sprintf("'%s': Invalid URI Part", $name));
-                }
+        if ($name === 'query') {
+            $this->setQuery($value);
+        } elseif ($name === 'port') {
+            $this->setPort($value);
+        } elseif ($name === 'scheme') {
+            $this->setScheme($value);
+        } elseif (!property_exists($this, $name)) {
+            throw new InvalidArgumentException(sprintf("'%s': Invalid URI Part", $name));
         }
 
         $this->$name = $value;
@@ -152,6 +210,6 @@ class URI implements JsonSerializable
 
     public function jsonSerialize()
     {
-        return $this->__toString();
+        return $this->asString();
     }
 }
