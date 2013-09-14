@@ -48,7 +48,7 @@ class URITest extends PHPUnit_Framework_TestCase
         );
     }
 
-    public function testBuilder()
+    public function testCompose()
     {
         $uri = new URI();
         $uri->setScheme('http');
@@ -110,6 +110,15 @@ class URITest extends PHPUnit_Framework_TestCase
         $this->assertEquals('baz', $uri->getFragment());
     }
 
+    public function testJson()
+    {
+        $uri = new URI('http://foo.bar/');
+        $this->assertEquals(
+            '"http:\/\/foo.bar\/"',
+            json_encode($uri)
+        );
+    }
+
     /**
      * @expectedException \InvalidArgumentException
      */
@@ -143,14 +152,5 @@ class URITest extends PHPUnit_Framework_TestCase
     {
         $uri = new URI();
         $test = $uri->schemer;
-    }
-
-    public function testJson()
-    {
-        $uri = new URI('http://foo.bar/');
-        $this->assertEquals(
-            '"http:\/\/foo.bar\/"',
-            json_encode($uri)
-        );
     }
 }

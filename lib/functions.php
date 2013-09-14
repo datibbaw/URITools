@@ -1,8 +1,8 @@
 <?php
 
-function url_replace($url, $components, $callback)
+function url_replace($url, $replace, $component = null)
 {
-    static $map = [
+    static $map = array(
         PHP_URL_SCHEME      => 'scheme',
         PHP_URL_USER        => 'user',
         PHP_URL_PASS        => 'pass',
@@ -11,21 +11,27 @@ function url_replace($url, $components, $callback)
         PHP_URL_PATH        => 'path',
         PHP_URL_QUERY       => 'query',
         PHP_URL_FRAGMENT    => 'fragment',
-    ];
+    );
+
+    if ($component !== null && !isset($map[$component])) {
+        return $url;
+    }
 
     if (($parts = parse_url($url)) === false) {
         return $url;
     }
 
-    if (!is_array($components)) {
-        $components = (array)$components;
-    }
-
-    foreach ($components as $component) {
+    if ($component !== null) {
         $key = $map[$component];
-        if (isset($parts[$key])) {
-            $parts[$key] = call_user_func($callback, $parts[$key], $component);
+        // perform replacement
+        if (is_string($replace) || is_null($replace)) {
+            $parts[$key] = $replace;
+        } else {
+            $old = isset($parts[$key]) ? $parts[$key] : null;
+            $parts[$key] = call_user_func($replace, $old, $component);
         }
+    } elseif (is_callable($replace)) {
+        $parts = call_user_func($replace, $parts);
     }
 
     return url_recombine($parts);
