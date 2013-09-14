@@ -3,5 +3,5 @@ php:
   - 5.4
 
 script:
-  composer install
-  phpunit --bootstrap vendor/autoload.php tests/
+  - composer install
+  - phpunit --bootstrap vendor/autoload.php tests/
